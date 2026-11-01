@@ -296,7 +296,13 @@ div.pick:hover{background:transparent}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="mock-claude.js"></script><!-- TEST ONLY: example data; remove this line on claude.ai -->
+<script src="firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-adapter.js"></script><!-- real database (Firebase) once firebase-config.js is filled in -->
+<script src="seed-data.js"></script>
+<script src="mock-claude.js"></script><!-- TEST ONLY: local example data while firebase-config.js is empty -->
 <script>
 (function(){
 'use strict';
@@ -334,7 +340,7 @@ var orderId=function(wk,name){return 'o_'+wk+'_'+toHex(normName(name))};
 var parseLines=function(v){return v.split('\n').map(function(x){return x.trim()}).filter(Boolean)};
 
 /* ---------- state ---------- */
-var S={db:null,downloads:null,canEdit:false,canWrite:null,cur:null,weekId:null,menu:null,staff:[],staffDirty:false,adminCfg:null,adminLoaded:false,
+var S={db:null,downloads:null,admin:null,canEdit:false,canWrite:null,cur:null,weekId:null,menu:null,staff:[],staffDirty:false,adminCfg:null,adminLoaded:false,
   orders:[],existing:null,saving:false,view:'order',unlocked:false,resetMode:false,gateKey:'',
   draft:{name:'',typing:false,picks:blankPicks(),note:'',dirty:false},
   adm:{menu:null,dirty:false,day:0},delConfirm:null,nameInit:false,allOrders:[],unAll:null,trkMonth:'',trkEdit:false,adj:{},adjMonth:'',unAdj:null,adjQ:Promise.resolve(),unM:null,unO:null,curLoaded:false};
@@ -504,7 +510,7 @@ async function saveOrder(){
     setMsg('saveMsg','ההזמנה נשמרה. אפשר לחזור ולעדכן אותה.','ok');
   }catch(e){
     S.saving=false;
-    setMsg('saveMsg',e&&e.code==='invalid_argument'?'אין הרשאה לשמור הזמנות. בקשו ממנהל/ת האתר הרשאה שמאפשרת לשמור נתונים בדף.':'השמירה נכשלה. נסו שוב.','err');
+    setMsg('saveMsg',e&&(e.code==='invalid_argument'||e.code==='permission-denied')?'אין הרשאה לשמור הזמנות. בקשו ממנהל/ת האתר הרשאה שמאפשרת לשמור נתונים בדף.':'השמירה נכשלה. נסו שוב.','err');
   }
   updateSaveUI();
 }
@@ -518,6 +524,7 @@ async function hashPw(pw,salt,iter){
   return bytesToHex(new Uint8Array(bits));
 }
 async function setPassword(pw){
+  if(S.admin){await S.admin.changePassword(pw);return}
   var salt=bytesToHex(crypto.getRandomValues(new Uint8Array(16))),iter=150000;
   var hash=await hashPw(pw,salt,iter);
   await S.db.doc('config/admin').set({salt:salt,iter:iter,hash:hash});
@@ -537,7 +544,7 @@ function renderGate(){
     g.innerHTML='<form class="card" id="setPwForm"><h2>הגדרת סיסמת מנהל</h2><div class="two"><div class="field"><label for="pw1">סיסמה חדשה (לפחות 6 תווים)</label><input id="pw1" type="password" autocomplete="new-password"></div><div class="field"><label for="pw2">אימות סיסמה</label><input id="pw2" type="password" autocomplete="new-password"></div></div><div class="row"><button class="primary" type="submit">שמירת סיסמה</button>'+(S.resetMode?'<button class="ghost" type="button" id="cancelReset">ביטול</button>':'')+'<span class="msg" id="gateMsg"></span></div></form>';
     return;
   }
-  g.innerHTML='<form class="card" id="loginForm"><h2>כניסת מנהל</h2><div class="field" style="max-width:340px"><label for="pwIn">סיסמה</label><input id="pwIn" type="password" autocomplete="current-password"></div><div class="row"><button class="primary" type="submit">כניסה</button>'+(S.canEdit?'<button class="ghost" type="button" id="forgot">איפוס סיסמה</button>':'')+'<span class="msg" id="gateMsg"></span></div></form>';
+  g.innerHTML='<form class="card" id="loginForm"><h2>כניסת מנהל</h2><div class="field" style="max-width:340px"><label for="pwIn">סיסמה</label><input id="pwIn" type="password" autocomplete="current-password"></div><div class="row"><button class="primary" type="submit">כניסה</button>'+(S.canEdit||S.admin?'<button class="ghost" type="button" id="forgot">איפוס סיסמה</button>':'')+'<span class="msg" id="gateMsg"></span></div></form>';
 }
 
 /* ---------- admin: menu editor ---------- */
@@ -864,6 +871,11 @@ function bind(){
       catch(err){setMsg('gateMsg','לא הצלחתי לשמור את הסיסמה. בדקו שיש לכם הרשאת עריכה.','err')}
     }else if(f.id==='loginForm'){
       var cfg=S.adminCfg;if(!cfg)return;
+      if(S.admin){
+        try{await S.admin.signIn($('pwIn').value)}
+        catch(err){var c=(err&&err.code)||'';setMsg('gateMsg',/password|credential|user-not-found/.test(c)?'הסיסמה שגויה.':(c==='auth/too-many-requests'?'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.':'הכניסה נכשלה. נסו שוב.'),'err')}
+        return;
+      }
       try{
         var h=await hashPw($('pwIn').value,cfg.salt,cfg.iter);
         if(h===cfg.hash){S.unlocked=true;ss.set('admOk',h);renderAdmin(true)}
@@ -872,10 +884,13 @@ function bind(){
     }
   });
   $('admGate').addEventListener('click',function(e){
-    if(e.target.id==='forgot'){S.resetMode=true;renderGate()}
+    if(e.target.id==='forgot'){
+      if(S.admin){S.admin.resetPassword().then(function(){setMsg('gateMsg','נשלח מייל לאיפוס הסיסמה לכתובת של המנהל/ת.','ok')},function(){setMsg('gateMsg','לא הצלחתי לשלוח מייל איפוס.','err')});return}
+      S.resetMode=true;renderGate();
+    }
     if(e.target.id==='cancelReset'){S.resetMode=false;renderGate()}
   });
-  $('lockBtn').addEventListener('click',function(){S.unlocked=false;ss.set('admOk','');S.gateKey='';renderAdmin(true)});
+  $('lockBtn').addEventListener('click',function(){if(S.admin){S.admin.signOut();return}S.unlocked=false;ss.set('admOk','');S.gateKey='';renderAdmin(true)});
 
   var ed=$('menuEd');
   ed.addEventListener('input',function(e){
@@ -953,8 +968,8 @@ async function init(){
   renderNameCtl();updateSaveUI();renderHeader();
   setView(location.hash==='#admin'?'admin':'order');
   var use=(window.claude&&window.claude.use)?window.claude.use.bind(window.claude):function(){return Promise.resolve(null)};
-  var res=await Promise.all([use('db'),use('user'),use('downloads')]);
-  var db=res[0],user=res[1];S.downloads=res[2];
+  var res=await Promise.all([use('db'),use('user'),use('downloads'),use('admin')]);
+  var db=res[0],user=res[1];S.downloads=res[2];S.admin=res[3];
   if(!db){showErr('אי אפשר להתחבר לנתונים. פתחו את הדף כשאתם מחוברים לחשבון, או בקשו ממנהל/ת האתר גישה.');renderBoard();return}
   S.db=db;
   if(user){S.canEdit=await user.canEdit();S.canWrite=await user.can('data.write')}
@@ -969,6 +984,12 @@ async function init(){
     S.staff=snap.exists?arr(snap.data().names):[];
     renderNameCtl();initName();onData();
   },function(){});
+  if(S.admin){
+    // Firebase: the admin signs in with a Firebase account, and the database rules enforce it.
+    S.adminCfg={firebase:true};S.adminLoaded=true;
+    S.admin.onChange(function(on){S.canEdit=on;S.unlocked=on;S.gateKey='';if(S.view==='admin')renderAdmin(true)});
+    return;
+  }
   db.doc('config/admin').onSnapshot(function(snap){
     S.adminCfg=snap.exists?snap.data():null;S.adminLoaded=true;
     S.unlocked=!!S.adminCfg&&ss.get('admOk')===S.adminCfg.hash;
