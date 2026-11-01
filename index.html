@@ -88,6 +88,7 @@ div.pick{cursor:default}
 div.pick:hover{background:transparent}
 .pick.on,.pick.on:hover{background:var(--pick);color:var(--pick-ink);font-weight:700;box-shadow:inset 0 0 0 2px var(--pick-edge)}
 .pick.on::before{content:"\2713\00a0"}
+.pick.na,.pick.na:hover{background:transparent;color:var(--muted);opacity:.45;cursor:not-allowed;text-decoration:line-through}
 .narrow{display:none}
 .daycard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
 .daycard h3{margin:0 0 8px;padding:8px 12px;background:var(--gold);color:var(--gold-ink);border-radius:8px;font-size:18px}
@@ -349,6 +350,9 @@ function setMsg(id,text,kind){var e=$(id);e.textContent=text||'';e.className='ms
 function needEdit(){if(S.canEdit)return true;toast('אין לך הרשאת עריכה באתר');return false}
 
 /* ---------- table / cards ---------- */
+/* Tuesday (day index 2): a stew comes without sides */
+var NO_SIDES_DAY=2;
+function sidesBlocked(p,d){return !!p&&d===NO_SIDES_DAY&&p.kind==='stew'}
 function isOn(p,sec,item){if(!p)return false;if(sec==='sides')return p.sides.indexOf(item)>=0;return p.kind===KIND[sec]&&p.item===item}
 function pickEl(t,inter,d,k,i,on){
   if(inter)return '<button type="button" class="pick" data-d="'+d+'" data-sec="'+k+'" data-i="'+i+'" aria-pressed="false">'+esc(t)+'</button>';
@@ -427,7 +431,9 @@ function paintPicks(){
     var b=list[n],d=+b.dataset.d,sec=b.dataset.sec,idx=+b.dataset.i;
     var text=S.menu.days[d][sec][idx];
     var on=isOn(S.draft.picks[d],sec,text);
+    var na=sec==='sides'&&sidesBlocked(S.draft.picks[d],d);
     b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');
+    b.classList.toggle('na',na);if(na)b.setAttribute('aria-disabled','true');else b.removeAttribute('aria-disabled');
   }
   paintNotes();
 }
@@ -439,12 +445,13 @@ function onPick(d,sec,idx){
   if(!S.draft.name){toast('בחרו קודם את השם שלכם');$('nameTxt').focus();return}
   var text=S.menu.days[d][sec][idx],p=S.draft.picks[d];
   if(sec==='sides'){
+    if(sidesBlocked(p,d)){toast('ביום שלישי אין תוספות עם תבשיל משתנה');return}
     if(p.kind==='salad'){p.kind='';p.item=''}
     var i=p.sides.indexOf(text);if(i>=0)p.sides.splice(i,1);else p.sides.push(text);
   }else{
     var k=KIND[sec];
     if(p.kind===k&&p.item===text){p.kind='';p.item=''}
-    else{p.kind=k;p.item=text;if(k==='salad')p.sides=[]}
+    else{p.kind=k;p.item=text;if(k==='salad'||sidesBlocked(p,d))p.sides=[]}
   }
   S.draft.dirty=true;setMsg('saveMsg','');paintPicks();updateSaveUI();
 }
@@ -497,7 +504,7 @@ async function saveOrder(){
   var name=S.draft.name;
   if(!name){toast('בחרו קודם את השם שלכם');return}
   var menu=S.menu;
-  var picks=S.draft.picks.map(function(p,i){return menu.days[i].closed?{kind:'',item:'',sides:[],note:''}:{kind:p.kind,item:p.item,sides:p.sides.slice(),note:(p.note||'').trim()}});
+  var picks=S.draft.picks.map(function(p,i){return menu.days[i].closed?{kind:'',item:'',sides:[],note:''}:{kind:p.kind,item:p.item,sides:sidesBlocked(p,i)?[]:p.sides.slice(),note:(p.note||'').trim()}});
   var bad=[];picks.forEach(function(p,i){if(p.sides.length&&!p.item)bad.push(DAYN[i])});
   if(bad.length){setMsg('saveMsg','ב'+(bad.length>1?'ימים ':'יום ')+bad.join(', ')+' בחרתם תוספות בלי מנה עיקרית או תבשיל. הוסיפו מנה או הסירו את התוספות.','err');return}
   if(!picks.some(function(p){return p.item||p.sides.length})){setMsg('saveMsg','עוד לא סימנתם אף מנה.','err');return}
