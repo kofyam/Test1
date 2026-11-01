@@ -232,9 +232,9 @@ div.pick:hover{background:transparent}
 
       <div class="card">
         <h2>קישור לעובדים</h2>
-        <p class="muted" style="margin-top:0">שלחו לעובדים את הקישור הזה. כדי שיוכלו לשמור הזמנה, צריך לשתף איתם את האתר בתפריט השיתוף (Share) בהרשאה שמאפשרת לשמור נתונים (Contributor), ולא בצפייה בלבד.</p>
+        <p class="muted" style="margin-top:0">שלחו לעובדים את הקישור הזה.</p>
         <div class="row">
-          <input id="shareLink" type="text" readonly dir="ltr" value="https://claude.ai/artifact/Xcg7v8t6guWX4HpFi868Fm" aria-label="קישור לעובדים" style="flex:1 1 280px;min-width:0;text-align:left">
+          <input id="shareLink" type="text" readonly dir="ltr" value="https://kofyam.github.io/Test1/" aria-label="קישור לעובדים" style="flex:1 1 280px;min-width:0;text-align:left">
           <button class="primary" id="copyLink" type="button">העתקת הקישור</button>
           <span class="msg" id="copyMsg" role="status"></span>
         </div>
@@ -923,6 +923,7 @@ function bind(){
       else fallback();
     }catch(e){fallback()}
   });
+  if(/^https?:$/.test(location.protocol))$('shareLink').value=location.origin+location.pathname;
   $('shareLink').addEventListener('focus',function(e){e.target.select()});
   $('trkLock').addEventListener('click',function(){S.trkEdit=!S.trkEdit;renderTracker()});
   var tb=$('trkBox');
