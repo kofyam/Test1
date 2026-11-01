@@ -5,7 +5,7 @@
  * These values are not secret: every Firebase web app ships them to the browser.
  * What protects the data is firestore.rules (published in the Firebase console).
  *
- * While FIREBASE_CONFIG is null, the site runs on local example data (mock-claude.js).
+ * While FIREBASE_CONFIG is null, the site cannot reach any data.
  */
 window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyD5uGzdsm4pBFW-plzOHVJFVbHdzK69EkM",

@@ -5,7 +5,7 @@
  *   user      -> canEdit() is true while the admin is signed in
  *   downloads -> saves files with a normal browser download
  *   admin     -> admin sign-in with Firebase Authentication (email from firebase-config.js)
- * Does nothing while firebase-config.js is empty, so mock-claude.js takes over.
+ * Does nothing while firebase-config.js is empty.
  */
 (function () {
   'use strict';
