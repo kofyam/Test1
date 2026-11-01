@@ -1,76 +1,410 @@
 /*
  * mock-claude.js — TEST ONLY.
- * Stands in for claude.ai's window.claude runtime so weekly_food_order.html
- * can run on GitHub Pages or straight from disk, with EXAMPLE data.
+ * Stands in for claude.ai's window.claude runtime so index.html
+ * can run on GitHub Pages or straight from disk, with the data from the owner's export.
  *
  * - Data lives in this browser's localStorage only (each visitor has their own copy).
- * - Add ?reset to the URL to wipe it and reload the example data.
- * - Example admin password: 1234
+ * - Add ?reset to the URL to wipe local changes and reload the exported data.
+ * - Test admin password: 1234 (the real one was not included in the export)
  */
 (function () {
   'use strict';
-  var KEY = 'mockdb_v2';
+  var KEY = 'mockdb_v3';
 
-  /* ---------- helpers (same formats the page uses) ---------- */
-  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-  function sundayOf(d) { d = new Date(d); d.setDate(d.getDate() - d.getDay()); return iso(d); }
-  function toHex(s) { return Array.from(new TextEncoder().encode(s)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join(''); }
-  function orderId(wk, name) { return 'o_' + wk + '_' + toHex(name.replace(/\s+/g, ' ').trim()); }
   function clone(o) { return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
-  function pick(kind, item, sides, note) { return { kind: kind || '', item: item || '', sides: sides || [], note: note || '' }; }
-  var NONE = pick();
 
-  /* ---------- example data ---------- */
+  /* ---------- data from the owner's export (meal-orders-package.zip, data/ folder) ----------
+   * Keys are the storage paths the page uses; values are the exported JSON files, unchanged.
+   * The export left out the admin password on purpose, so a TEST password (1234) is added below. */
   function seed() {
-    var wk = sundayOf(new Date());
-    var db = {};
-
-    db['config/current'] = { weekId: wk };
-    db['config/employees'] = { names: ['אפי', 'דנה כהן', 'יוסי לוי', 'מיכל אברהם', 'אורי פרץ', 'נועה ביטון', 'רון מזרחי'] };
-    // Admin password "1234" (PBKDF2-SHA256, 150000 iterations — same scheme the page uses)
-    db['config/admin'] = { salt: 'a1b2c3d4e5f60718293a4b5c6d7e8f90', iter: 150000, hash: 'de4290ecd9c571b52cc44c498119077ffe2b173e238fbd137908eab15302deba' };
-
-    // Main dishes and salads as in the creator's screenshots (same every day);
-    // stews and sides change weekly, so those are made-up examples.
-    var mains = ['שניצל', 'פרגיות', 'קבב', 'מעורב הבית', 'חזה עוף', 'נקניקיות מרגז', 'נקניקיות צוריסו', 'חביתה/ירק - כריך', 'חביתה/ירק בצלחת'];
-    var salads = ['סלט חזה עוף', 'סלט טונה וביצה', 'סלט ירקות גדול'];
-    db['menus/' + wk] = {
-      start: wk,
-      company: 'מסעדה לדוגמה',
-      footer: 'טלפון להזמנות: 03-0000000 (לדוגמה)',
-      days: [
-        { closed: false, mains: mains, salads: salads, stews: ['חמין', 'אורז עם עוף'], sides: ['אורז', 'צ׳יפס', 'ירקות מוקפצים'] },
-        { closed: false, mains: mains, salads: salads, stews: ['גולאש'], sides: ['פירה', 'אורז', 'שעועית ירוקה'] },
-        { closed: false, mains: mains, salads: salads, stews: ['מג׳דרה', 'קציצות ברוטב'], sides: ['קוסקוס', 'תפו״א אפויים'] },
-        { closed: false, mains: mains, salads: salads, stews: ['עוף בתנור'], sides: ['אורז', 'צ׳יפס', 'סלט כרוב'] },
-        { closed: false, mains: mains, salads: salads, stews: ['קובה סלק'], sides: ['אורז', 'פסטה', 'ירקות מאודים'] }
-      ]
+    var db = {
+      "config/adj_2026-11": {
+        "o": {
+          "2026-11-01_d790d799d7a8d799d7a1": "0",
+          "2026-11-01_d790d7a4d799": "0",
+          "2026-11-01_d792d79c": "1",
+          "2026-11-02_d790d7a4d799": "0",
+          "2026-11-03_d790d799d7a8d799d7a1": "0",
+          "2026-11-03_d790d7a4d799": "0",
+          "2026-11-03_d792d79c": "1",
+          "2026-11-04_d790d799d7a8d799d7a1": "0",
+          "2026-11-05_d790d799d7a8d799d7a1": "0",
+          "2026-11-05_d792d79c": "1"
+        }
+      },
+      "config/current": {
+        "weekId": "2026-11-08"
+      },
+      "config/employees": {
+        "names": [
+          "אורי",
+          "גל",
+          "ניר",
+          "פמלה",
+          "איריס",
+          "איציק",
+          "איימן",
+          "סימונה",
+          "אנדריי",
+          "טמלאו",
+          "קרן",
+          "מוריה",
+          "אפי",
+          "סבטיאן",
+          "עידו",
+          "גסטון",
+          "אורח"
+        ]
+      },
+      "menus/2026-11-01": {
+        "company": "אומן לייזר",
+        "days": [
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [
+              "פסטה",
+              "אורז לבן",
+              "ציפס"
+            ],
+            "stews": [
+              "דג פילה מטוגן"
+            ]
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [
+              "אורז לבן",
+              "בורגול עם ירקות",
+              "צ'יפס"
+            ],
+            "stews": [
+              "המבורגר"
+            ]
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [],
+            "stews": []
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [
+              "אורז לבן",
+              "שעועית מוקפצת",
+              "אורז ירקות",
+              "צ'יפס"
+            ],
+            "stews": [
+              "פרגית בצל וניוקי",
+              "שקשוקה / שקשוקה מרגז"
+            ]
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [
+              "איטריות עם בצל",
+              "אורז לבן",
+              "כרוב מבושל"
+            ],
+            "stews": [
+              "דג מרוקאי",
+              "בשר ראש עם חומוס"
+            ]
+          }
+        ],
+        "footer": "בכל הזמנה מקבלים חמגשית סלט (לא ניתן לבחירה) ניתן להזמין את כל מנות הבשרים בבגט/פיתה בתוספת ציפס",
+        "start": "2026-11-01"
+      },
+      "menus/2026-11-08": {
+        "company": "אומן לייזר",
+        "days": [
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [
+              "אורז",
+              "שעועית",
+              "ציפס"
+            ],
+            "stews": [
+              "קציצות",
+              "תבשיל כבש"
+            ]
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [],
+            "stews": []
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [],
+            "stews": []
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [],
+            "stews": []
+          },
+          {
+            "closed": false,
+            "closedText": "",
+            "mains": [
+              "שניצל",
+              "פרגיות",
+              "קבב",
+              "מעורב הבית",
+              "חזה עוף",
+              "נקניקיות מרגז",
+              "נקניקיות צוריסו",
+              "חביתה/ירק - כריך",
+              "חביתה/ירק  בצלחת"
+            ],
+            "salads": [
+              "סלט חזה עוף",
+              "סלט טונה וביצה"
+            ],
+            "sides": [],
+            "stews": []
+          }
+        ],
+        "footer": "• בכל הזמנה מקבלים חמגשית סלט (לא ניתן לבחירה) • ניתן להזמין את כל מנות הבשרים בבגט/פיתה בתוספת ציפס",
+        "rules": "ניתן לבחור מנה עיקרית אחת או תבשיל אחד, ולהוסיף כמה תוספות או לבחור סלט בלבד. לחיצה נוספת על מנה מבטלת אותה.",
+        "start": "2026-11-08"
+      },
+      "orders/o_2026-11-01_d790d799d7a8d799d7a1": {
+        "name": "איריס",
+        "picks": [
+          {
+            "item": "דג פילה מטוגן",
+            "kind": "stew",
+            "note": "איגלו שלון",
+            "sides": [
+              "פסטה",
+              "אורז לבן"
+            ]
+          },
+          {
+            "item": "",
+            "kind": "",
+            "note": "",
+            "sides": []
+          },
+          {
+            "item": "סלט חזה עוף",
+            "kind": "salad",
+            "note": "",
+            "sides": []
+          },
+          {
+            "item": "פרגית בצל וניוקי",
+            "kind": "stew",
+            "note": "",
+            "sides": [
+              "אורז לבן",
+              "שעועית מוקפצת"
+            ]
+          },
+          {
+            "item": "נקניקיות צוריסו",
+            "kind": "main",
+            "note": "",
+            "sides": [
+              "איטריות עם בצל",
+              "אורז לבן"
+            ]
+          }
+        ],
+        "updatedAt": "2026-10-31T08:31:53.594Z",
+        "weekId": "2026-11-01"
+      },
+      "orders/o_2026-11-01_d790d7a4d799": {
+        "name": "אפי",
+        "picks": [
+          {
+            "item": "דג פילה מטוגן",
+            "kind": "stew",
+            "note": "",
+            "sides": [
+              "פסטה",
+              "אורז לבן",
+              "ציפס"
+            ]
+          },
+          {
+            "item": "סלט חזה עוף",
+            "kind": "salad",
+            "note": "",
+            "sides": []
+          },
+          {
+            "item": "פרגיות",
+            "kind": "main",
+            "note": "",
+            "sides": []
+          },
+          {
+            "item": "",
+            "kind": "",
+            "note": "",
+            "sides": []
+          },
+          {
+            "item": "",
+            "kind": "",
+            "note": "",
+            "sides": []
+          }
+        ],
+        "updatedAt": "2026-10-30T21:34:59.129Z",
+        "weekId": "2026-11-01"
+      }
     };
-
-    function order(name, picks) {
-      db['orders/' + orderId(wk, name)] = { weekId: wk, name: name, picks: picks, updatedAt: new Date().toISOString() };
-    }
-    order('דנה כהן', [
-      pick('main', 'שניצל', ['אורז', 'צ׳יפס']),
-      pick('salad', 'סלט חזה עוף'),
-      pick('stew', 'מג׳דרה', ['קוסקוס']),
-      NONE,
-      pick('main', 'פרגיות', ['פסטה'], 'בלי בצל')
-    ]);
-    order('יוסי לוי', [
-      pick('stew', 'חמין', ['אורז']),
-      pick('main', 'קבב', ['פירה']),
-      NONE,
-      pick('main', 'מעורב הבית', ['צ׳יפס', 'סלט כרוב']),
-      pick('salad', 'סלט טונה וביצה')
-    ]);
-    order('מיכל אברהם', [
-      pick('main', 'חביתה/ירק בצלחת', [], 'חביתה ירק, בלי לחם'),
-      pick('main', 'חזה עוף', ['אורז', 'שעועית ירוקה']),
-      pick('salad', 'סלט ירקות גדול'),
-      pick('main', 'חזה עוף', ['אורז']),
-      NONE
-    ]);
+    // Admin password "1234" (PBKDF2-SHA256, 150000 iterations — same scheme the page uses). TEST ONLY.
+    db["config/admin"] = { salt: "a1b2c3d4e5f60718293a4b5c6d7e8f90", iter: 150000, hash: "de4290ecd9c571b52cc44c498119077ffe2b173e238fbd137908eab15302deba" };
     return db;
   }
 
@@ -148,5 +482,5 @@
       return Promise.resolve({ db: db, user: user, downloads: downloads }[name] || null);
     }
   };
-  console.info('[mock-claude] Using EXAMPLE data from localStorage. Add ?reset to the URL to start over. Admin password: 1234');
+  console.info('[mock-claude] Using data from the owner export (kept in localStorage). Add ?reset to the URL to start over. Test admin password: 1234');
 })();
